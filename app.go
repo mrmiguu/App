@@ -14,7 +14,7 @@ import (
 
 var (
 	Addr = "localhost:80"
-	Temp = "www"
+	Temp = "temp"
 
 	run sync.Once
 	api string
@@ -30,7 +30,7 @@ func findRand(ext string) string {
 	var name string
 	for {
 		name = fmt.Sprintf("%x", md5.Sum([]byte(name)))
-		if _, err := os.Stat(Temp + "/" + name + ext); os.IsNotExist(err) {
+		if _, err := os.Stat("." + Temp + "/" + name + ext); os.IsNotExist(err) {
 			break
 		}
 	}
@@ -41,16 +41,16 @@ func new() {
 	if end := len(Temp) - 1; Temp[end] == '/' {
 		Temp = Temp[:end]
 	}
-	Must(os.RemoveAll(Temp))
-	Must(os.MkdirAll(Temp, os.ModePerm))
-	Must(ioutil.WriteFile("index.html", []byte(htmlDefaultIndex), os.ModePerm))
-	http.Handle("/", http.FileServer(http.Dir(Temp)))
+	Must(os.RemoveAll("." + Temp))
+	Must(os.MkdirAll("."+Temp, os.ModePerm))
+	Must(ioutil.WriteFile("."+Temp+"/index.html", []byte(htmlDefaultIndex), os.ModePerm))
+	http.Handle("/", http.FileServer(http.Dir("."+Temp)))
 
 	up := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 
-	http.HandleFunc("/"+Temp+"/.", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/."+Temp+"/.", func(w http.ResponseWriter, r *http.Request) {
 		conn, err := up.Upgrade(w, r, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -65,7 +65,7 @@ func new() {
 		}
 	})
 
-	go http.ListenAndServe(Addr, nil)
+	go func() { Must(http.ListenAndServe(Addr, nil)) }()
 }
 
 type Image struct {
@@ -95,7 +95,7 @@ func LoadImage(url string) <-chan *Image {
 		}
 		key := findRand(ext)
 
-		err = ioutil.WriteFile(Temp+"/"+key, b, os.ModePerm)
+		err = ioutil.WriteFile("."+Temp+"/"+key, b, os.ModePerm)
 		if err != nil {
 			c <- nil
 			return
