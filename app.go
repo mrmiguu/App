@@ -8,13 +8,14 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var (
 	Addr = "localhost:80"
-	Temp = "temp"
+	Temp = "www"
 
 	run sync.Once
 	api string
@@ -42,8 +43,12 @@ func new() {
 		Temp = Temp[:end]
 	}
 	Must(os.RemoveAll("." + Temp))
-	Must(os.MkdirAll("."+Temp, os.ModePerm))
-	Must(ioutil.WriteFile("."+Temp+"/index.html", []byte(htmlDefaultIndex), os.ModePerm))
+	Must(os.Mkdir("."+Temp, os.ModePerm))
+	phaserminjs, err := ioutil.ReadFile("phaser.min.js")
+	Must(err)
+	Must(ioutil.WriteFile("."+Temp+"/phaser.min.js", phaserminjs, os.ModePerm))
+	Must(ioutil.WriteFile("."+Temp+"/index.html", []byte(defaultHTML), os.ModePerm))
+	Must(ioutil.WriteFile("."+Temp+"/main.js", []byte(defaultJS), os.ModePerm))
 	http.Handle("/", http.FileServer(http.Dir("."+Temp)))
 
 	up := websocket.Upgrader{
@@ -104,4 +109,7 @@ func LoadImage(url string) <-chan *Image {
 		c <- &Image{key}
 	}()
 	return c
+}
+
+func (i *Image) Show(b bool, d ...time.Duration) {
 }
