@@ -3,16 +3,20 @@ package app
 const (
 	jsMainCreateHeader = `
 function create()`
+
 	jsMainCreateBody = `
 game.load.onFileComplete.add(function(__, key) {
-	console.log('key='+key);
 	for (var i in files) {
-		if (files[i].key != key) {
+		if (files[i].key !== key) {
 			continue;
 		}
-		files[i].ld()
+		if (i > 0) {
+			files[i-1].promise.then().then(files[i].ok);
+		} else {
+			files[i].ok();
+		}
 	}
-})`
+});`
 
 	jsMainTween = `
 function tween(obj, to, ms, fn) {
@@ -26,18 +30,21 @@ function tween(obj, to, ms, fn) {
 
 func jsLoadImage(key string) string {
 	return `
-var i = files.length;
-files.push({
-	key: '` + key + `',
-	ld: function() {
-		if (i > 0) {
-			files[i-1].ld.then(ok);
-		} else {
-		}
-	}
-});
-game.load.image('` + key + `', '` + key + `');
-game.load.start();`
+(function() {
+	var i = files.length;
+	files.push({ key: '` + key + `' });
+	files[i].promise = new Promise(function(ok) {
+		files[i].ok = ok;
+		game.load.image('` + key + `', '` + key + `');
+		game.load.start();
+	});
+	files[i].promise.then(function() {
+		var obj = game.add.sprite(game.world.centerX, game.world.centerY, '` + key + `');
+		obj.anchor.setTo(0.5, 0.5);
+		obj.bringToTop();
+		console.log('file #'+i+' loaded');
+	});
+})();`
 }
 
 func jsMain(jsMainCreate string) []byte {

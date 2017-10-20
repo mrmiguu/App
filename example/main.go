@@ -6,18 +6,15 @@ import (
 
 func main() {
 	for i, url := range []string{
-		"images/mighty_no_09_cover_art_by_robduenas.jpg",
-		"images/cougar_dragonsun.png",
+		"images/zcougar_dragonsun.png",
 		"images/trsipic1_lazur.jpg",
-		"images/archmage_in_your_face.png",
-		"images/acryl_bladerunner.png",
-		"images/acryl_bobablast.png",
 		"images/alex-bisleys_horsy_5.png",
+		"images/acryl_bobablast.png",
 	} {
 		go func(ld <-chan *app.Image, i int) {
 			img := <-ld
 			if img == nil {
-				println("bad image url #", i)
+				println("bad image url")
 				return
 			}
 

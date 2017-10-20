@@ -1,25 +1,79 @@
 
-var game = new Phaser.Game(800, 600, null, null, { preload: preload, create: create });
-function preload(){
-}
+var files = [];
+var game = new Phaser.Game(800, 600, null, null, { create: create });
 function create(){
 game.load.onFileComplete.add(function(__, key) {
-	console.log('key='+key)
-})
-game.load.image('d41d8cd98f00b204e9800998ecf8427e.png', 'd41d8cd98f00b204e9800998ecf8427e.png');
-game.load.start();
-game.load.image('74be16979710d4c4e7c6647856088456.png', '74be16979710d4c4e7c6647856088456.png');
-game.load.start();
-game.load.image('acf7ef943fdeb3cbfed8dd0d8f584731.png', 'acf7ef943fdeb3cbfed8dd0d8f584731.png');
-game.load.start();
-game.load.image('5a8dccb220de5c6775c873ead6ff2e43.png', '5a8dccb220de5c6775c873ead6ff2e43.png');
-game.load.start();
-game.load.image('76682f743ae018364a082b2e87f2d2f5.png', '76682f743ae018364a082b2e87f2d2f5.png');
-game.load.start();
-game.load.image('d41d8cd98f00b204e9800998ecf8427e.jpg', 'd41d8cd98f00b204e9800998ecf8427e.jpg');
-game.load.start();
-game.load.image('74be16979710d4c4e7c6647856088456.jpg', '74be16979710d4c4e7c6647856088456.jpg');
-game.load.start();}
+	for (var i in files) {
+		if (files[i].key !== key) {
+			continue;
+		}
+		if (i > 0) {
+			files[i-1].promise.then().then(files[i].ok);
+		} else {
+			files[i].ok();
+		}
+	}
+});
+(function() {
+	var i = files.length;
+	files.push({ key: 'd41d8cd98f00b204e9800998ecf8427e' });
+	files[i].promise = new Promise(function(ok) {
+		files[i].ok = ok;
+		game.load.image('d41d8cd98f00b204e9800998ecf8427e', 'd41d8cd98f00b204e9800998ecf8427e');
+		game.load.start();
+	});
+	files[i].promise.then(function() {
+		var obj = game.add.sprite(game.world.centerX, game.world.centerY, 'd41d8cd98f00b204e9800998ecf8427e');
+		obj.anchor.setTo(0.5, 0.5);
+		obj.bringToTop();
+		console.log('file #'+i+' loaded');
+	});
+})();
+(function() {
+	var i = files.length;
+	files.push({ key: '74be16979710d4c4e7c6647856088456' });
+	files[i].promise = new Promise(function(ok) {
+		files[i].ok = ok;
+		game.load.image('74be16979710d4c4e7c6647856088456', '74be16979710d4c4e7c6647856088456');
+		game.load.start();
+	});
+	files[i].promise.then(function() {
+		var obj = game.add.sprite(game.world.centerX, game.world.centerY, '74be16979710d4c4e7c6647856088456');
+		obj.anchor.setTo(0.5, 0.5);
+		obj.bringToTop();
+		console.log('file #'+i+' loaded');
+	});
+})();
+(function() {
+	var i = files.length;
+	files.push({ key: 'acf7ef943fdeb3cbfed8dd0d8f584731' });
+	files[i].promise = new Promise(function(ok) {
+		files[i].ok = ok;
+		game.load.image('acf7ef943fdeb3cbfed8dd0d8f584731', 'acf7ef943fdeb3cbfed8dd0d8f584731');
+		game.load.start();
+	});
+	files[i].promise.then(function() {
+		var obj = game.add.sprite(game.world.centerX, game.world.centerY, 'acf7ef943fdeb3cbfed8dd0d8f584731');
+		obj.anchor.setTo(0.5, 0.5);
+		obj.bringToTop();
+		console.log('file #'+i+' loaded');
+	});
+})();
+(function() {
+	var i = files.length;
+	files.push({ key: '5a8dccb220de5c6775c873ead6ff2e43' });
+	files[i].promise = new Promise(function(ok) {
+		files[i].ok = ok;
+		game.load.image('5a8dccb220de5c6775c873ead6ff2e43', '5a8dccb220de5c6775c873ead6ff2e43');
+		game.load.start();
+	});
+	files[i].promise.then(function() {
+		var obj = game.add.sprite(game.world.centerX, game.world.centerY, '5a8dccb220de5c6775c873ead6ff2e43');
+		obj.anchor.setTo(0.5, 0.5);
+		obj.bringToTop();
+		console.log('file #'+i+' loaded');
+	});
+})();}
 function tween(obj, to, ms, fn) {
 	var t = game.add.tween(obj);
 	t.to(to, ms);

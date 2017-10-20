@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,15 +32,86 @@ func Must(err error) {
 	}
 }
 
-func findRand(ext string) string {
+func findRand() string {
 	var name string
 	for {
 		name = fmt.Sprintf("%x", md5.Sum([]byte(name)))
-		if _, err := os.Stat(temp + "/" + name + ext); os.IsNotExist(err) {
+		if _, err := os.Stat(temp + "/" + name); os.IsNotExist(err) {
 			break
 		}
 	}
-	return name + ext
+	return name
+}
+
+type Image struct {
+	key string
+}
+
+func LoadImage(url string) <-chan *Image {
+	c := make(chan *Image)
+
+	go func() {
+		b, err := ioutil.ReadFile(url)
+		if err != nil {
+			println("failed to read `" + url + "`")
+			resp, err := http.Get(url)
+			if err != nil {
+				println("failed to get `" + url + "`")
+				c <- nil
+				return
+			}
+			defer resp.Body.Close()
+			b, err = ioutil.ReadAll(resp.Body)
+		}
+
+		// var ext string
+		// idx := strings.LastIndex(url, ".")
+		// if idx != -1 {
+		// 	ext = url[idx:]
+		// }
+
+		osfl.Lock()
+		key := findRand()
+		err = ioutil.WriteFile(temp+"/"+key, b, os.ModePerm)
+		osfl.Unlock()
+		if err != nil {
+			println("failed to write `" + key + "`")
+			c <- nil
+			return
+		}
+
+		jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
+
+		c <- &Image{key}
+	}()
+
+	return c
+}
+
+func (i *Image) Pos() (int, int) {
+	return -1, -1
+}
+
+func (i *Image) Size() (int, int) {
+	return -1, -1
+}
+
+// func (i *Image) Show(b bool, d ...time.Duration) {
+// 	jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
+// }
+
+func (i *Image) Resize(width, height int, d ...time.Duration) {
+}
+
+func duration(d ...time.Duration) int {
+	if len(d) >= 2 {
+		panic("too many arguments")
+	}
+	dur := 1
+	if len(d) == 1 {
+		dur = int(d[0].Seconds() * 1000)
+	}
+	return dur
 }
 
 func Serve() {
@@ -75,75 +145,4 @@ func Serve() {
 	})
 
 	log.Fatal(http.ListenAndServe(Addr, nil))
-}
-
-type Image struct {
-	key string
-}
-
-func LoadImage(url string) <-chan *Image {
-	c := make(chan *Image)
-
-	go func() {
-		b, err := ioutil.ReadFile(url)
-		if err != nil {
-			println("failed to read `" + url + "`")
-			resp, err := http.Get(url)
-			if err != nil {
-				println("failed to get `" + url + "`")
-				c <- nil
-				return
-			}
-			defer resp.Body.Close()
-			b, err = ioutil.ReadAll(resp.Body)
-		}
-
-		var ext string
-		idx := strings.LastIndex(url, ".")
-		if idx != -1 {
-			ext = url[idx:]
-		}
-
-		osfl.Lock()
-		key := findRand(ext)
-		err = ioutil.WriteFile(temp+"/"+key, b, os.ModePerm)
-		osfl.Unlock()
-		if err != nil {
-			println("failed to write `" + key + "`")
-			c <- nil
-			return
-		}
-
-		jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
-
-		c <- &Image{key}
-	}()
-
-	return c
-}
-
-func (i *Image) Pos() (int, int) {
-	return -1, -1
-}
-
-func (i *Image) Size() (int, int) {
-	return -1, -1
-}
-
-func (i *Image) Show(b bool, d ...time.Duration) {
-	jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
-}
-
-func (i *Image) Resize(width, height int, d ...time.Duration) {
-}
-
-func duration(d ...time.Duration) int {
-	if len(d) >= 2 {
-		panic("too many arguments")
-	}
-	dur := 1
-	if len(d) == 1 {
-		dur = int(d[0].Seconds() * 1000)
-	}
-	return dur
 }
