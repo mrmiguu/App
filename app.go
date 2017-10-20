@@ -17,13 +17,14 @@ import (
 var (
 	Addr = "localhost:80"
 
-	temp = " "
-	osfl sync.Mutex
+	temp         = " "
+	osfl         sync.Mutex
+	jsMainCreate = make(chan string, 1)
 )
 
 func init() {
 	Must(os.RemoveAll(temp))
-	Must(os.MkdirAll(temp, os.ModePerm))
+	jsMainCreate <- ``
 }
 
 func Must(err error) {
@@ -44,12 +45,14 @@ func findRand(ext string) string {
 }
 
 func Serve() {
+	Must(os.MkdirAll(temp, os.ModePerm))
+
 	phaserminjs, err := ioutil.ReadFile("phaser.min.js")
 	Must(err)
 	Must(ioutil.WriteFile(temp+"/phaser.min.js", phaserminjs, os.ModePerm))
 	Must(ioutil.WriteFile(temp+"/index.html", htmlIndex(), os.ModePerm))
 	Must(ioutil.WriteFile(temp+"/styles.css", cssStyles(), os.ModePerm))
-	Must(ioutil.WriteFile(temp+"/main.js", jsMain(), os.ModePerm))
+	Must(ioutil.WriteFile(temp+"/main.js", jsMain(<-jsMainCreate), os.ModePerm))
 	http.Handle("/", http.FileServer(http.Dir(temp)))
 
 	up := websocket.Upgrader{
@@ -111,6 +114,8 @@ func LoadImage(url string) <-chan *Image {
 			return
 		}
 
+		jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
+
 		c <- &Image{key}
 	}()
 
@@ -126,6 +131,7 @@ func (i *Image) Size() (int, int) {
 }
 
 func (i *Image) Show(b bool, d ...time.Duration) {
+	jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
 }
 
 func (i *Image) Resize(width, height int, d ...time.Duration) {
