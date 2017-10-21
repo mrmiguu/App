@@ -11,19 +11,19 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/mrmiguu/app/js"
 )
 
 var (
 	Addr = "localhost:80"
 
-	temp         = " "
-	osfl         sync.Mutex
-	jsMainCreate = make(chan string, 1)
+	temp = " "
+	osfl sync.Mutex
 )
 
 func init() {
 	Must(os.RemoveAll(temp))
-	jsMainCreate <- ``
+	Must(os.Mkdir(temp, os.ModePerm))
 }
 
 func Must(err error) {
@@ -45,47 +45,36 @@ func findRand() string {
 
 type Image struct {
 	key string
+	v   js.Var
 }
 
-func LoadImage(url string) <-chan *Image {
-	c := make(chan *Image)
+func AddImage(url string) (Image, error) {
+	var img Image
 
-	go func() {
-		b, err := ioutil.ReadFile(url)
+	b, err := ioutil.ReadFile(url)
+	if err != nil {
+		println("failed to read `" + url + "`")
+		resp, err := http.Get(url)
 		if err != nil {
-			println("failed to read `" + url + "`")
-			resp, err := http.Get(url)
-			if err != nil {
-				println("failed to get `" + url + "`")
-				c <- nil
-				return
-			}
-			defer resp.Body.Close()
-			b, err = ioutil.ReadAll(resp.Body)
+			println("failed to get `" + url + "`")
+			return img, err
 		}
+		defer resp.Body.Close()
+		b, err = ioutil.ReadAll(resp.Body)
+	}
 
-		// var ext string
-		// idx := strings.LastIndex(url, ".")
-		// if idx != -1 {
-		// 	ext = url[idx:]
-		// }
+	osfl.Lock()
+	key := findRand()
+	err = ioutil.WriteFile(temp+"/"+key, b, os.ModePerm)
+	osfl.Unlock()
+	if err != nil {
+		println("failed to write `" + key + "`")
+		return img, err
+	}
 
-		osfl.Lock()
-		key := findRand()
-		err = ioutil.WriteFile(temp+"/"+key, b, os.ModePerm)
-		osfl.Unlock()
-		if err != nil {
-			println("failed to write `" + key + "`")
-			c <- nil
-			return
-		}
-
-		jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
-
-		c <- &Image{key}
-	}()
-
-	return c
+	img.key = key
+	img.v = js.AddImage(key)
+	return img, nil
 }
 
 func (i *Image) Pos() (int, int) {
@@ -96,14 +85,19 @@ func (i *Image) Size() (int, int) {
 	return -1, -1
 }
 
-// func (i *Image) Show(b bool, d ...time.Duration) {
-// 	jsMainCreate <- <-jsMainCreate + jsLoadImage(key)
-// }
+func (i *Image) Show(b bool, d ...time.Duration) {
+	ms := toMS(d...)
+	a := 1
+	if !b {
+		a = 0
+	}
+	js.Tween(i.v, js.O{"alpha": a}, ms)
+}
 
 func (i *Image) Resize(width, height int, d ...time.Duration) {
 }
 
-func duration(d ...time.Duration) int {
+func toMS(d ...time.Duration) int {
 	if len(d) >= 2 {
 		panic("too many arguments")
 	}
@@ -115,14 +109,12 @@ func duration(d ...time.Duration) int {
 }
 
 func Serve() {
-	Must(os.MkdirAll(temp, os.ModePerm))
-
 	phaserminjs, err := ioutil.ReadFile("phaser.min.js")
 	Must(err)
 	Must(ioutil.WriteFile(temp+"/phaser.min.js", phaserminjs, os.ModePerm))
 	Must(ioutil.WriteFile(temp+"/index.html", htmlIndex(), os.ModePerm))
 	Must(ioutil.WriteFile(temp+"/styles.css", cssStyles(), os.ModePerm))
-	Must(ioutil.WriteFile(temp+"/main.js", jsMain(<-jsMainCreate), os.ModePerm))
+	Must(ioutil.WriteFile(temp+"/main.js", js.Compile(), os.ModePerm))
 	http.Handle("/", http.FileServer(http.Dir(temp)))
 
 	up := websocket.Upgrader{
