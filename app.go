@@ -26,23 +26,6 @@ func init() {
 	Must(os.Mkdir(temp, os.ModePerm))
 }
 
-func Must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func findRand() string {
-	var name string
-	for {
-		name = fmt.Sprintf("%x", md5.Sum([]byte(name)))
-		if _, err := os.Stat(temp + "/" + name); os.IsNotExist(err) {
-			break
-		}
-	}
-	return name
-}
-
 type Image struct {
 	key string
 	v   js.Var
@@ -95,6 +78,24 @@ func (i *Image) Show(b bool, d ...time.Duration) {
 }
 
 func (i *Image) Resize(width, height int, d ...time.Duration) {
+	js.Tween(i.v, js.O{"width": width, "height": height}, toMS(d...))
+}
+
+func Must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func findRand() string {
+	var name string
+	for {
+		name = fmt.Sprintf("%x", md5.Sum([]byte(name)))
+		if _, err := os.Stat(temp + "/" + name); os.IsNotExist(err) {
+			break
+		}
+	}
+	return name
 }
 
 func toMS(d ...time.Duration) int {

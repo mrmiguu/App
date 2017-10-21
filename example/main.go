@@ -1,12 +1,15 @@
 package main
 
 import (
+	"sync"
 	"time"
 
 	"github.com/mrmiguu/app"
 )
 
 func main() {
+	var wg sync.WaitGroup
+	wg.Add(4)
 	for _, url := range []string{
 		"images/zcougar_dragonsun.png",
 		"images/trsipic1_lazur.jpg",
@@ -17,9 +20,14 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		// i := i
 		go func() {
+			defer wg.Done()
+
+			time.Sleep(1000 * time.Millisecond)
+			img.Show(true, 1*time.Second)
 			// img.Resize(600-i*90, 600-i*90)
-			img.Show(true, 2500*time.Millisecond)
 
 			// width, height := img.Size()
 
@@ -28,6 +36,7 @@ func main() {
 			// img.Show(false, 2500-i*125)
 		}()
 	}
+	wg.Wait()
 
 	app.Serve()
 }

@@ -15,9 +15,22 @@ var (
 	preloadTail = make(chan string, 1)
 	createBody  = make(chan string, 1)
 	createTail  = make(chan string, 1)
+	lastGID     = make(chan uint64, 1)
 )
 
+func init() {
+	images <- map[string]bool{}
+
+	preloadBody <- ``
+	preloadTail <- ``
+	createBody <- ``
+	createTail <- ``
+
+	lastGID <- 0
+}
+
 type Var string
+
 type O map[string]interface{}
 
 func (obj O) String() string {
@@ -28,18 +41,28 @@ func (obj O) String() string {
 	return `{` + strings.Join(fields, `,`) + `}`
 }
 
-func init() {
-	images <- map[string]bool{}
-
-	preloadBody <- ``
-	preloadTail <- ``
-	createBody <- ``
-	createTail <- ``
-}
-
 func Tween(v Var, obj O, ms int) {
-	createBody <- <-createBody + `
-tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `);`
+	body := <-createBody
+	if sameRoutine() {
+		ok := `ok` + string(v)
+
+		createBody <- body + `
+p.then(function() {
+	p = new Promise(function(` + ok + `) {	
+		tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ` + ok + `);
+	});`
+
+		createTail <- `
+});` + <-createTail
+
+	} else {
+
+		createBody <- body + `
+var p = new Promise(function(ok) {
+	tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ok);
+});`
+
+	}
 }
 
 func AddImage(key string) Var {
@@ -108,7 +131,7 @@ function tween(obj, to, ms, fn) {
 	var t = game.add.tween(obj);
 	t.to(to, ms);
 	t.frameBased = true;
-	// t.onComplete.add(fn);
+	t.onComplete.add(fn);
 	t.start();
 }
 
@@ -122,6 +145,14 @@ func Compile() []byte {
 		compileCreate(),
 		compileFunctions(),
 	}, nil)
+}
+
+func sameRoutine() bool {
+	old := <-lastGID
+	new := gid()
+	b := new == old && old > 0
+	lastGID <- new
+	return b
 }
 
 func gid() uint64 {
