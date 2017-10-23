@@ -1,15 +1,32 @@
 
 
-var game = new Phaser.Game(800, 600, null, null, { preload: preload, create: create });
+var game = new Phaser.Game(600, 800, null, null, { preload: preload, create: create });
 
 
 
 function preload() {
+	game.canvas.oncontextmenu = function(e) { e.preventDefault(); };
+
+	// var inW = window.innerWidth;
+	// var inH = window.innerHeight;
+	// if (800 > 600) {
+	// 	var newW = (600 / 800) * inH;
+	// 	game.scale.setMinMax(newW, inH, newW, inH);
+	// } else {
+	// 	var newH = (800 / 600) * inW;
+	// 	game.scale.setMinMax(inW, newH, inW, newH);
+	// }
+	
+	game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+	game.scale.pageAlignVertically = true;
+	game.scale.pageAlignHorizontally = true;
+
+	setTimeout(function() {
+		document.body.style.visibility = 'visible';
+	}, 200);
+
 	
 loadImage('d41d8cd98f00b204e9800998ecf8427e');
-loadImage('74be16979710d4c4e7c6647856088456');
-loadImage('acf7ef943fdeb3cbfed8dd0d8f584731');
-loadImage('5a8dccb220de5c6775c873ead6ff2e43');
 	
 }
 
@@ -17,21 +34,29 @@ loadImage('5a8dccb220de5c6775c873ead6ff2e43');
 
 function create() {
 	
-var _d41d8cd98f00b204e9800998ecf8427e = addImage('d41d8cd98f00b204e9800998ecf8427e')
-var _74be16979710d4c4e7c6647856088456 = addImage('74be16979710d4c4e7c6647856088456')
-var _acf7ef943fdeb3cbfed8dd0d8f584731 = addImage('acf7ef943fdeb3cbfed8dd0d8f584731')
-var _5a8dccb220de5c6775c873ead6ff2e43 = addImage('5a8dccb220de5c6775c873ead6ff2e43')
-var p = new Promise(function(ok) {
-	tween(_d41d8cd98f00b204e9800998ecf8427e, {alpha:1}, 1000, ok);
+var _d41d8cd98f00b204e9800998ecf8427e = addImage('d41d8cd98f00b204e9800998ecf8427e');
+		var tween_1x0_d41d8cd98f00b204e9800998ecf8427e = new Promise(function(ok) {
+			tween(_d41d8cd98f00b204e9800998ecf8427e, {width:600,height:600}, 1, ok);
+			});
+var tween_1x1_d41d8cd98f00b204e9800998ecf8427e = new Promise(function(ok) {
+	tween_1x0_d41d8cd98f00b204e9800998ecf8427e.then(function() {
+		tween(_d41d8cd98f00b204e9800998ecf8427e, {alpha:1}, 2500, ok);
+	});
 });
-var p = new Promise(function(ok) {
-	tween(_74be16979710d4c4e7c6647856088456, {alpha:1}, 1000, ok);
+var tween_1x2_d41d8cd98f00b204e9800998ecf8427e = new Promise(function(ok) {
+	tween_1x1_d41d8cd98f00b204e9800998ecf8427e.then(function() {
+		tween(_d41d8cd98f00b204e9800998ecf8427e, {x:300,y:300}, 5000, ok);
+	});
 });
-var p = new Promise(function(ok) {
-	tween(_acf7ef943fdeb3cbfed8dd0d8f584731, {alpha:1}, 1000, ok);
+var tween_1x3_d41d8cd98f00b204e9800998ecf8427e = new Promise(function(ok) {
+	tween_1x2_d41d8cd98f00b204e9800998ecf8427e.then(function() {
+		tween(_d41d8cd98f00b204e9800998ecf8427e, {alpha:0}, 2500, ok);
+	});
 });
-var p = new Promise(function(ok) {
-	tween(_5a8dccb220de5c6775c873ead6ff2e43, {alpha:1}, 1000, ok);
+var tween_6x0_d41d8cd98f00b204e9800998ecf8427e = new Promise(function(ok) {
+	tween_1x3_d41d8cd98f00b204e9800998ecf8427e.then(function() {
+		tween(_d41d8cd98f00b204e9800998ecf8427e, {width:-600,height:-600}, 5000, ok);
+	});
 });
 	
 }

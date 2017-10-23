@@ -2,11 +2,17 @@ package app
 
 import (
 	"crypto/md5"
+	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,71 +23,184 @@ import (
 var (
 	Addr = "localhost:80"
 
+	Width = 800
+
+	Height = 600
+
 	temp = " "
 	osfl sync.Mutex
+
+	once  sync.Once
+	serve sync.Mutex
+
+	upgr = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+
+	fatal = make(chan error)
 )
 
 func init() {
-	Must(os.RemoveAll(temp))
-	Must(os.Mkdir(temp, os.ModePerm))
+	must(os.RemoveAll(temp))
+	must(os.Mkdir(temp, os.ModePerm))
+
+	println("[serving...]")
+	serve.Lock()
+}
+
+func bind() {
+	http.Handle("/", http.FileServer(http.Dir(temp)))
+	http.HandleFunc("/"+temp+"/_", onConnection)
+
+	go func() {
+		err := http.ListenAndServe(Addr, nil)
+		if err != nil {
+			fatal <- err
+		}
+	}()
+}
+
+func onConnection(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgr.Upgrade(w, r, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	println("[connection...]")
+	serve.Lock()
+	serve.Unlock()
+	println("[connection  !]")
+	for {
+		t, b, err := conn.ReadMessage()
+		if err != nil || t != websocket.BinaryMessage {
+			return
+		}
+		println("packet:", string(b))
+	}
 }
 
 type Image struct {
-	key string
-	v   js.Var
+	lock          *sync.RWMutex
+	data          image.Image
+	x, y          int
+	width, height int
+	key           string
+	v             js.Var
 }
 
 func AddImage(url string) (Image, error) {
-	var img Image
+	once.Do(bind)
 
-	b, err := ioutil.ReadFile(url)
+	var i Image
+	var r io.Reader
+
+	f, err := os.Open(url)
 	if err != nil {
 		println("failed to read `" + url + "`")
 		resp, err := http.Get(url)
 		if err != nil {
 			println("failed to get `" + url + "`")
-			return img, err
+			return i, err
 		}
 		defer resp.Body.Close()
-		b, err = ioutil.ReadAll(resp.Body)
+		r = resp.Body
+	} else {
+		defer f.Close()
+		r = f
+	}
+
+	img, _, err := image.Decode(r)
+	if err != nil {
+		return i, err
 	}
 
 	osfl.Lock()
 	key := findRand()
-	err = ioutil.WriteFile(temp+"/"+key, b, os.ModePerm)
+	f2, err := os.Create(temp + "/" + key)
 	osfl.Unlock()
 	if err != nil {
 		println("failed to write `" + key + "`")
-		return img, err
+		return i, err
+	}
+	defer f2.Close()
+
+	ext := strings.LastIndex(url, ".")
+	if ext == -1 {
+		return i, errors.New("unknown image type")
 	}
 
-	img.key = key
-	img.v = js.AddImage(key)
-	return img, nil
+	switch strings.ToLower(url[ext:]) {
+	case ".jpeg":
+		fallthrough
+	case ".jpg":
+		err = jpeg.Encode(f2, img, nil)
+	case ".png":
+		err = png.Encode(f2, img)
+	default:
+		return i, errors.New("unsupported image type")
+	}
+	if err != nil {
+		println("failed to encode `" + key + "`")
+		return i, err
+	}
+
+	i.lock = &sync.RWMutex{}
+	i.data = img
+
+	i.x = Width / 2
+	i.y = Height / 2
+
+	size := img.Bounds().Size()
+	i.width = size.X
+	i.height = size.Y
+
+	i.key = key
+	i.v = js.AddImage(key)
+
+	return i, nil
 }
 
 func (i *Image) Pos() (int, int) {
-	return -1, -1
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	return i.x, i.y
 }
 
 func (i *Image) Size() (int, int) {
-	return -1, -1
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	return i.width, i.height
 }
 
 func (i *Image) Show(b bool, d ...time.Duration) {
-	ms := toMS(d...)
 	a := 1
 	if !b {
 		a = 0
 	}
-	js.Tween(i.v, js.O{"alpha": a}, ms)
+	js.Tween(i.v, js.O{"alpha": a}, toMS(d...))
+}
+
+func (i *Image) Move(x, y int, d ...time.Duration) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	js.Tween(i.v, js.O{"x": x, "y": y}, toMS(d...))
+
+	i.x = x
+	i.y = y
 }
 
 func (i *Image) Resize(width, height int, d ...time.Duration) {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
 	js.Tween(i.v, js.O{"width": width, "height": height}, toMS(d...))
+
+	i.width = width
+	i.height = height
 }
 
-func Must(err error) {
+func must(err error) {
 	if err != nil {
 		panic(err)
 	}
@@ -110,32 +229,24 @@ func toMS(d ...time.Duration) int {
 }
 
 func Serve() {
+	once.Do(bind)
+
 	phaserminjs, err := ioutil.ReadFile("phaser.min.js")
-	Must(err)
-	Must(ioutil.WriteFile(temp+"/phaser.min.js", phaserminjs, os.ModePerm))
-	Must(ioutil.WriteFile(temp+"/index.html", htmlIndex(), os.ModePerm))
-	Must(ioutil.WriteFile(temp+"/styles.css", cssStyles(), os.ModePerm))
-	Must(ioutil.WriteFile(temp+"/main.js", js.Compile(), os.ModePerm))
-	http.Handle("/", http.FileServer(http.Dir(temp)))
+	must(err)
 
-	up := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
-	}
+	osfl.Lock()
+	must(ioutil.WriteFile(temp+"/phaser.min.js", phaserminjs, os.ModePerm))
+	must(ioutil.WriteFile(temp+"/index.html", htmlIndex(), os.ModePerm))
+	must(ioutil.WriteFile(temp+"/styles.css", cssStyles(), os.ModePerm))
 
-	http.HandleFunc("/"+temp+"/_", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := up.Upgrade(w, r, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		for {
-			t, b, err := conn.ReadMessage()
-			if err != nil || t != websocket.BinaryMessage {
-				return
-			}
-			println(string(b))
-		}
-	})
+	js.Width = strconv.Itoa(Width)
+	js.Height = strconv.Itoa(Height)
+	b := js.Compile()
 
-	log.Fatal(http.ListenAndServe(Addr, nil))
+	must(ioutil.WriteFile(temp+"/main.js", b, os.ModePerm))
+	osfl.Unlock()
+
+	serve.Unlock()
+	println("[serving  !]")
+	panic(<-fatal)
 }

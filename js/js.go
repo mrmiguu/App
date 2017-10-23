@@ -9,13 +9,19 @@ import (
 )
 
 var (
+	Width = "800"
+
+	Height = "600"
+
 	images = make(chan map[string]bool, 1)
 
 	preloadBody = make(chan string, 1)
 	preloadTail = make(chan string, 1)
 	createBody  = make(chan string, 1)
 	createTail  = make(chan string, 1)
-	lastGID     = make(chan uint64, 1)
+
+	lastGID   = make(chan string, 1)
+	gidTweens = make(chan map[string]int, 1)
 )
 
 func init() {
@@ -26,7 +32,7 @@ func init() {
 	createBody <- ``
 	createTail <- ``
 
-	lastGID <- 0
+	gidTweens <- map[string]int{}
 }
 
 type Var string
@@ -43,26 +49,31 @@ func (obj O) String() string {
 
 func Tween(v Var, obj O, ms int) {
 	body := <-createBody
-	if sameRoutine() {
-		ok := `ok` + string(v)
+	gids := <-gidTweens
+	id := gid()
+	n := gids[id]
+	t := `tween_` + id + `x` + strconv.Itoa(n) + string(v)
+	if len(gids) > 0 {
+		lastv := <-lastGID
 
 		createBody <- body + `
-p.then(function() {
-	p = new Promise(function(` + ok + `) {	
-		tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ` + ok + `);
-	});`
-
-		createTail <- `
-});` + <-createTail
+var ` + t + ` = new Promise(function(ok) {
+	` + lastv + `.then(function() {
+		tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ok);
+	});
+});`
 
 	} else {
 
 		createBody <- body + `
-var p = new Promise(function(ok) {
-	tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ok);
-});`
+		var ` + t + ` = new Promise(function(ok) {
+			tween(` + string(v) + `, ` + obj.String() + `, ` + strconv.Itoa(ms) + `, ok);
+			});`
 
 	}
+	gids[id] = n + 1
+	lastGID <- t
+	gidTweens <- gids
 }
 
 func AddImage(key string) Var {
@@ -78,7 +89,7 @@ loadImage('` + key + `');`
 	v := `_` + key
 
 	createBody <- <-createBody + `
-var ` + v + ` = addImage('` + key + `')`
+var ` + v + ` = addImage('` + key + `');`
 
 	return Var(v)
 }
@@ -86,7 +97,7 @@ var ` + v + ` = addImage('` + key + `')`
 func compile() []byte {
 	return []byte(`
 
-var game = new Phaser.Game(800, 600, null, null, { preload: preload, create: create });
+var game = new Phaser.Game(` + Width + `, ` + Height + `, null, null, { preload: preload, create: create });
 
 `)
 }
@@ -95,6 +106,26 @@ func compilePreload() []byte {
 	return []byte(`
 
 function preload() {
+	game.canvas.oncontextmenu = function(e) { e.preventDefault(); };
+
+	// var inW = window.innerWidth;
+	// var inH = window.innerHeight;
+	// if (` + Height + ` > ` + Width + `) {
+	// 	var newW = (` + Width + ` / ` + Height + `) * inH;
+	// 	game.scale.setMinMax(newW, inH, newW, inH);
+	// } else {
+	// 	var newH = (` + Height + ` / ` + Width + `) * inW;
+	// 	game.scale.setMinMax(inW, newH, inW, newH);
+	// }
+	
+	game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
+	game.scale.pageAlignVertically = true;
+	game.scale.pageAlignHorizontally = true;
+
+	setTimeout(function() {
+		document.body.style.visibility = 'visible';
+	}, 200);
+
 	` + <-preloadBody + `
 	` + <-preloadTail + `
 }
@@ -147,19 +178,18 @@ func Compile() []byte {
 	}, nil)
 }
 
-func sameRoutine() bool {
-	old := <-lastGID
-	new := gid()
-	b := new == old && old > 0
-	lastGID <- new
-	return b
-}
+// func sameRoutine() bool {
+// 	old := <-lastGID
+// 	new := gid()
+// 	b := new == old && old > 0
+// 	lastGID <- new
+// 	return b
+// }
 
-func gid() uint64 {
+func gid() string {
 	b := make([]byte, 64)
 	b = b[:runtime.Stack(b, false)]
 	b = bytes.TrimPrefix(b, []byte("goroutine "))
 	b = b[:bytes.IndexByte(b, ' ')]
-	gid, _ := strconv.ParseUint(string(b), 10, 64)
-	return gid
+	return string(b)
 }
