@@ -39,15 +39,28 @@ var (
 )
 
 func init() {
+	println("[removing old...]")
 	must(os.RemoveAll(temp))
+	println("[removing old  !]")
+
+	println("[creating new...]")
 	must(os.Mkdir(temp, os.ModePerm))
+	println("[creating new  !]")
 
 	println("[serving...]")
 	serve.Lock()
 }
 
 func bind() {
-	http.Handle("/", http.FileServer(http.Dir(temp)))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		println("[connection...]")
+		serve.Lock()
+		serve.Unlock()
+		println("[connection  !]")
+
+		http.ServeFile(w, r, temp)
+	})
+
 	http.HandleFunc("/"+temp+"/_", onConnection)
 
 	go func() {
@@ -64,10 +77,6 @@ func onConnection(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	println("[connection...]")
-	serve.Lock()
-	serve.Unlock()
-	println("[connection  !]")
 	for {
 		t, b, err := conn.ReadMessage()
 		if err != nil || t != websocket.BinaryMessage {
@@ -75,6 +84,14 @@ func onConnection(w http.ResponseWriter, r *http.Request) {
 		}
 		println("packet:", string(b))
 	}
+}
+
+func NewGroup(nameA, nameB string, names ...string) {
+	strings.Join(append([]string{nameA, nameB}, names...), "▼")
+}
+
+type Group struct {
+	// Live
 }
 
 type Image struct {
@@ -248,5 +265,8 @@ func Serve() {
 
 	serve.Unlock()
 	println("[serving  !]")
-	panic(<-fatal)
+
+	if err := <-fatal; err != nil {
+		panic(err)
+	}
 }
