@@ -1,11 +1,16 @@
 package main
 
+import (
+	"github.com/mrmiguu/App/my"
+	"github.com/mrmiguu/App/our"
+)
+
 func main() {
 	menu := my.New("menu")
-	menu.AddImage("for-me-only.png")
+	menu.AddImage("myMenu.png")
 
 	world := our.New("world")
-	world.AddImage("for-us-all.jpg")
+	world.AddImage("ourMenu.jpg")
 
 	start.Show()
 

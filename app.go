@@ -90,8 +90,7 @@ func NewGroup(nameA, nameB string, names ...string) {
 	strings.Join(append([]string{nameA, nameB}, names...), "▼")
 }
 
-type Group struct {
-	// Live
+type Space struct {
 }
 
 type Image struct {
