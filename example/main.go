@@ -1,8 +1,11 @@
 package main
 
 func main() {
-	login := app.AddText("Login")
-	start := app.AddText("Start")
+	menu := my.New("menu")
+	menu.AddImage("for-me-only.png")
+
+	world := our.New("world")
+	world.AddImage("for-us-all.jpg")
 
 	start.Show()
 
@@ -10,10 +13,10 @@ func main() {
 
 	start.HitFunc(func() {
 		start.Hide()
-
 		login.Show()
-		login.HitFunc(func() {
-			login.Hide()
-		})
+	})
+
+	login.HitFunc(func() {
+		login.Hide()
 	})
 }
